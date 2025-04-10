@@ -122,7 +122,7 @@ async def checkThreshold(data, websocket):
 # WebSocket runner
 async def run_websocket():
     port = int(os.environ.get("PORT", 10000))
-    server = await websockets.serve(handle_websocket, "0.0.0.0", port)
+    server = await websockets.serve(handle_websocket, "0.0.0.0", port, path="/ws")  # Add the path here
     print(f"🚀 WebSocket server is running on port {port}...")
     await server.wait_closed()
 
