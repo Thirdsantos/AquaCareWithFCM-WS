@@ -4,7 +4,7 @@ import asyncio
 import websockets
 from flask import Flask
 import firebase_admin
-from firebase_admin import credentials, db
+from firebase_admin import credentials, db, messaging
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -75,6 +75,21 @@ def updateToDb(data):
     ref.update(data)
     print("✅ Successfully updated Firebase")
 
+def send_fcm_notification(title, body):
+    message = messaging.Message(
+        notification=messaging.Notification(
+            title=title,
+            body=body
+        ),
+        topic="aquacare",
+    )
+
+    try:
+        response = messaging.send(message)
+        print(f"✅ FCM sent successfully: {response}")
+    except Exception as e:
+        print(f"❌ FCM sending failed: {e}")
+
 async def checkThreshold(data, websocket):
     ph_value = refPh.get()
     temp_value = refTemp.get()
@@ -87,14 +102,17 @@ async def checkThreshold(data, websocket):
     if ph_value and ph_value["Min"] != 0 and ph_value["Max"] != 0:
         if ph < ph_value["Min"] or ph > ph_value["Max"]:
             await websocket.send(json.dumps({"alertForPH": "⚠️ PH value is out of range!"}))
+            await asyncio.to_thread(send_fcm_notification, "PH Alert", f"PH value {ph} is out of range!")
 
     if temp_value and temp_value["Min"] != 0 and temp_value["Max"] != 0:
         if temp < temp_value["Min"] or temp > temp_value["Max"]:
             await websocket.send(json.dumps({"alertForTemp": "⚠️ Temperature value is out of range!"}))
+            # Optional: Add FCM for temperature here
 
     if turb_value and turb_value["Min"] != 0 and turb_value["Max"] != 0:
         if turb < turb_value["Min"] or turb > turb_value["Max"]:
             await websocket.send(json.dumps({"alertForTurb": "⚠️ Turbidity value is out of range!"}))
+            # Optional: Add FCM for turbidity here
 
 async def start_websocket_server():
     port = int(os.environ.get("PORT", 10000))  # Important for Render
