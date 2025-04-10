@@ -3,7 +3,7 @@ import json
 import asyncio
 import threading
 import websockets
-from flask import Flask
+from flask import Flask, request
 import firebase_admin
 from firebase_admin import credentials, db, messaging
 from dotenv import load_dotenv
@@ -38,9 +38,13 @@ refNotif = db.reference("Notifications")
 def index():
     return "AQUACARE THE BRIDGE BETWEEN THE GAPS"
 
-@app.route("/health", methods=["GET"])
+@app.route("/health", methods=["GET", "HEAD"])
 def health_check():
-    return "✅ Server is healthy!", 200
+    if request.method == "GET":
+        return "✅ Server is healthy!", 200
+    elif request.method == "HEAD":
+        # Simply respond with a 200 for the health check (no body needed for HEAD)
+        return '', 200
 
 # WebSocket Handler
 async def handle_websocket(websocket, path):
