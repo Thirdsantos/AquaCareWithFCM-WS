@@ -33,11 +33,11 @@ refTurb = db.reference("Notification/Turbidity")
 ref = db.reference("Sensors")
 refNotif = db.reference("Notifications")
 
-@app.route("/", methods=["GET", "HEAD"])
+@app.route("/", methods=["GET"])
 def index():
     return "AQUACARE THE BRIDGE BETWEEN THE GAPS"
 
-@app.route("/health", methods=["GET", "HEAD"])
+@app.route("/health", methods=["GET"])
 def health_check():
     return "✅ Server is healthy!", 200
 
