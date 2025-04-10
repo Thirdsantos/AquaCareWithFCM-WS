@@ -32,10 +32,14 @@ refTurb = db.reference("Notification/Turbidity")
 ref = db.reference("Sensors")
 refNotif = db.reference("Notifications")
 
-# --- Flask Route with HEAD support ---
 @app.route("/", methods=["GET", "HEAD"])
 def index():
     return "AQUACARE THE BRIDGE BETWEEN THE GAPS"
+
+@app.route("/health", methods=["GET", "HEAD"])
+def health_check():
+    return "✅ Server is healthy!", 200
+
 
 # WebSocket Handler
 async def handle_websocket(websocket, path):
