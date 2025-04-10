@@ -42,7 +42,7 @@ def index():
 # -------------------- WebSocket Logic --------------------
 
 async def handle_websocket(websocket, path):
-    await websocket.send(json.dumps({"message": "You're now connected to the WebSocket server"}))
+    await websocket.send(json.dumps({"message": "✅ You're now connected to the WebSocket server"}))
 
     try:
         async for message in websocket:
@@ -119,18 +119,16 @@ def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-def run_websocket(loop):
+async def run_websocket():
     port = int(os.environ.get("WS_PORT", 8765))
-    ws_server = websockets.serve(handle_websocket, "0.0.0.0", port)
-    print(f"🧩 WebSocket server is running on port {port}")
-    loop.run_until_complete(ws_server)
-    loop.run_forever()
+    server = await websockets.serve(handle_websocket, "0.0.0.0", port)
+    print(f"🧩 WebSocket server is running on port {port}...")
+    await server.wait_closed()
 
 if __name__ == "__main__":
+    # Start Flask server in a separate thread
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.start()
 
-    # Create a new event loop for WebSocket
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    run_websocket(loop)
+    # Run WebSocket server in the main event loop
+    asyncio.run(run_websocket())
