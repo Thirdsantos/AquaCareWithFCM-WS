@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import threading
 import websockets
 from flask import Flask
 import firebase_admin
@@ -39,7 +40,6 @@ def index():
 @app.route("/health", methods=["GET", "HEAD"])
 def health_check():
     return "✅ Server is healthy!", 200
-
 
 # WebSocket Handler
 async def handle_websocket(websocket, path):
@@ -124,12 +124,15 @@ async def checkThreshold(data, websocket):
             send_fcm_notification("Turbidity Alert", f"Turbidity value {turb} is out of range!")
 
 # Function to start WebSocket server
-async def start_websocket_server():
-    port = int(os.environ.get("PORT", 10000))  # Important for Render
-    server = await websockets.serve(handle_websocket, "0.0.0.0", port)
-    print(f"🚀 WebSocket server is running on port {port}...")
-    await server.wait_closed()
+def start_websocket_server():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    ws_port = 8765  # separate port for WebSocket
+    start_server = websockets.serve(handle_websocket, "0.0.0.0", ws_port)
+    loop.run_until_complete(start_server)
+    print(f"🚀 WebSocket server is running on port {ws_port}...")
+    loop.run_forever()
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_websocket_server())
+    threading.Thread(target=start_websocket_server, daemon=True).start()
+    app.run(host="0.0.0.0", port=10000)
