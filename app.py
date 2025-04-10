@@ -109,12 +109,10 @@ async def checkThreshold(data, websocket):
     if temp_value and temp_value["Min"] != 0 and temp_value["Max"] != 0:
         if temp < temp_value["Min"] or temp > temp_value["Max"]:
             await websocket.send(json.dumps({"alertForTemp": "⚠️ Temperature value is out of range!"}))
-            # Optional: Add FCM for temperature here
 
     if turb_value and turb_value["Min"] != 0 and turb_value["Max"] != 0:
         if turb < turb_value["Min"] or turb > turb_value["Max"]:
             await websocket.send(json.dumps({"alertForTurb": "⚠️ Turbidity value is out of range!"}))
-            # Optional: Add FCM for turbidity here
 
 # --- Thread to Start WebSocket Server ---
 def run_websocket():
