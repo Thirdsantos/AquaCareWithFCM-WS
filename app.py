@@ -3,13 +3,16 @@ import json
 import asyncio
 import websockets
 from flask import Flask
+from flask_cors import CORS  # Enable CORS for the frontend
 import firebase_admin
 from firebase_admin import credentials, db, messaging
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# Flask setup
 app = Flask(__name__)
+CORS(app)  # Allow CORS for all domains
 
 # Firebase setup
 firebase_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
@@ -35,10 +38,14 @@ refNotif = db.reference("Notifications")
 
 @app.route("/", methods=["GET"])
 def index():
-    return "AQUACARE THE BRIDGE BETWEEN THE GAPS"
+    return "🌊 AQUACARE: THE BRIDGE BETWEEN THE GAPS"
 
 # WebSocket Handler
 async def handle_websocket(websocket, path):
+    if path != "/ws":
+        await websocket.close()
+        return
+
     await websocket.send(json.dumps({"message": "✅ You're now connected to the WebSocket server"}))
 
     try:
@@ -47,24 +54,21 @@ async def handle_websocket(websocket, path):
             try:
                 data = json.loads(message)
 
-                if isinstance(data, dict):
-                    if "PH" in data and "Temperature" in data and "Turbidity" in data:
-                        sensor_data = {
-                            "PH": data["PH"],
-                            "Temperature": data["Temperature"],
-                            "Turbidity": data["Turbidity"]
-                        }
+                if isinstance(data, dict) and all(k in data for k in ["PH", "Temperature", "Turbidity"]):
+                    sensor_data = {
+                        "PH": data["PH"],
+                        "Temperature": data["Temperature"],
+                        "Turbidity": data["Turbidity"]
+                    }
 
-                        updateToDb(sensor_data)
-                        await checkThreshold(sensor_data, websocket)
+                    updateToDb(sensor_data)
+                    await checkThreshold(sensor_data, websocket)
 
-                        await websocket.send(json.dumps({"PH": sensor_data["PH"]}))
-                        await websocket.send(json.dumps({"Temperature": sensor_data["Temperature"]}))
-                        await websocket.send(json.dumps({"Turbidity": sensor_data["Turbidity"]}))
-                    else:
-                        await websocket.send(json.dumps({"error": "Invalid data format"}))
+                    await websocket.send(json.dumps({"PH": sensor_data["PH"]}))
+                    await websocket.send(json.dumps({"Temperature": sensor_data["Temperature"]}))
+                    await websocket.send(json.dumps({"Turbidity": sensor_data["Turbidity"]}))
                 else:
-                    await websocket.send(json.dumps({"error": "Invalid JSON structure"}))
+                    await websocket.send(json.dumps({"error": "Invalid data format"}))
             except Exception as e:
                 print(f"❌ Error handling message: {e}")
                 await websocket.send(json.dumps({"error": "Error processing data"}))
@@ -76,7 +80,7 @@ async def handle_websocket(websocket, path):
 # Firebase update function
 def updateToDb(data):
     ref.update(data)
-    print("✅ Successfully updated Firebase")
+    print("✅ Firebase updated with:", data)
 
 # FCM function
 def send_fcm_notification(title, body):
@@ -90,9 +94,9 @@ def send_fcm_notification(title, body):
 
     try:
         response = messaging.send(message)
-        print(f"✅ FCM sent successfully: {response}")
+        print(f"✅ FCM notification sent: {response}")
     except Exception as e:
-        print(f"❌ FCM sending failed: {e}")
+        print(f"❌ Failed to send FCM notification: {e}")
 
 # Check thresholds and send alerts if needed
 async def checkThreshold(data, websocket):
@@ -119,21 +123,23 @@ async def checkThreshold(data, websocket):
             await websocket.send(json.dumps({"alertForTurb": "⚠️ Turbidity value is out of range!"}))
             send_fcm_notification("Turbidity Alert", f"Turbidity value {turb} is out of range!")
 
-# WebSocket runner
+# WebSocket server
 async def run_websocket():
-    port = int(os.environ.get("PORT", 10000))
-    server = await websockets.serve(handle_websocket, "0.0.0.0", port, path="/ws")  # Add the path here
+    port = int(os.environ.get("WS_PORT", 10000))
+    server = await websockets.serve(handle_websocket, "0.0.0.0", port, ping_interval=None)
     print(f"🚀 WebSocket server is running on port {port}...")
     await server.wait_closed()
 
-# Flask runner (async mode)
-async def run_flask():
+# Flask server
+def run_flask():
     app.run(host="0.0.0.0", port=5000)
 
-# Entry point
+# Main
 if __name__ == "__main__":
-    # Start Flask and WebSocket server concurrently using asyncio
-    loop = asyncio.get_event_loop()
-    loop.create_task(run_flask())
-    loop.create_task(run_websocket())
-    loop.run_forever()
+    import threading
+
+    # Run Flask in separate thread
+    threading.Thread(target=run_flask).start()
+
+    # Run WebSocket server
+    asyncio.run(run_websocket())
