@@ -27,6 +27,7 @@ else:
     print("❌ Error: GOOGLE_APPLICATION_CREDENTIALS_JSON not found.")
     exit()
 
+# Firebase references
 refPh = db.reference("Notification/PH")
 refTemp = db.reference("Notification/Temperature")
 refTurb = db.reference("Notification/Turbidity")
@@ -98,6 +99,7 @@ def send_fcm_notification(title, body):
     except Exception as e:
         print(f"❌ FCM sending failed: {e}")
 
+# Check thresholds and send alerts if needed
 async def checkThreshold(data, websocket):
     ph_value = refPh.get()
     temp_value = refTemp.get()
@@ -135,8 +137,10 @@ async def run_websocket():
 
 # Entry point
 if __name__ == "__main__":
+    # Start Flask in a separate thread
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.start()
 
+    # Start WebSocket server using asyncio
     loop = asyncio.get_event_loop()
     loop.run_until_complete(run_websocket())
