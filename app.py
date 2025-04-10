@@ -116,19 +116,21 @@ async def checkThreshold(data, websocket):
 # -------------------- Run Flask + WebSocket --------------------
 
 def run_flask():
-    port = int(os.environ.get("PORT", 10000))  # Render sets this PORT
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-async def start_websocket_server():
-    port = int(os.environ.get("WS_PORT", 8765))  # You can set this separately from PORT
-    async with websockets.serve(handle_websocket, "0.0.0.0", port):
-        print(f"🧩 WebSocket server is running on port {port}")
-        await asyncio.Future()  # run forever
+def run_websocket(loop):
+    port = int(os.environ.get("WS_PORT", 8765))
+    ws_server = websockets.serve(handle_websocket, "0.0.0.0", port)
+    print(f"🧩 WebSocket server is running on port {port}")
+    loop.run_until_complete(ws_server)
+    loop.run_forever()
 
 if __name__ == "__main__":
-    # Start Flask in a separate thread
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.start()
 
-    # Start WebSocket server in the main event loop
-    asyncio.run(start_websocket_server())
+    # Create a new event loop for WebSocket
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    run_websocket(loop)
