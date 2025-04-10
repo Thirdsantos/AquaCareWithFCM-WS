@@ -6,7 +6,6 @@ from flask import Flask
 import firebase_admin
 from firebase_admin import credentials, db, messaging
 from dotenv import load_dotenv
-import threading
 
 load_dotenv()
 
@@ -33,11 +32,12 @@ refTurb = db.reference("Notification/Turbidity")
 ref = db.reference("Sensors")
 refNotif = db.reference("Notifications")
 
-# --- Flask App for HTTP/Health Check ---
+# --- Flask Route with HEAD support ---
 @app.route("/", methods=["GET", "HEAD"])
-def health_check():
+def index():
     return "AQUACARE THE BRIDGE BETWEEN THE GAPS"
 
+# WebSocket Handler
 async def handle_websocket(websocket, path):
     await websocket.send(json.dumps({"message": "✅ You're now connected to the WebSocket server"}))
 
@@ -73,10 +73,12 @@ async def handle_websocket(websocket, path):
     finally:
         print("🔌 A client disconnected.")
 
+# Firebase update function
 def updateToDb(data):
     ref.update(data)
     print("✅ Successfully updated Firebase")
 
+# FCM function
 def send_fcm_notification(title, body):
     message = messaging.Message(
         notification=messaging.Notification(
@@ -92,6 +94,7 @@ def send_fcm_notification(title, body):
     except Exception as e:
         print(f"❌ FCM sending failed: {e}")
 
+# Function to check sensor thresholds and send FCM if out of range
 async def checkThreshold(data, websocket):
     ph_value = refPh.get()
     temp_value = refTemp.get()
@@ -104,31 +107,25 @@ async def checkThreshold(data, websocket):
     if ph_value and ph_value["Min"] != 0 and ph_value["Max"] != 0:
         if ph < ph_value["Min"] or ph > ph_value["Max"]:
             await websocket.send(json.dumps({"alertForPH": "⚠️ PH value is out of range!"}))
-            await asyncio.to_thread(send_fcm_notification, "PH Alert", f"PH value {ph} is out of range!")
+            send_fcm_notification("PH Alert", f"PH value {ph} is out of range!")
 
     if temp_value and temp_value["Min"] != 0 and temp_value["Max"] != 0:
         if temp < temp_value["Min"] or temp > temp_value["Max"]:
             await websocket.send(json.dumps({"alertForTemp": "⚠️ Temperature value is out of range!"}))
+            send_fcm_notification("Temperature Alert", f"Temperature value {temp} is out of range!")
 
     if turb_value and turb_value["Min"] != 0 and turb_value["Max"] != 0:
         if turb < turb_value["Min"] or turb > turb_value["Max"]:
             await websocket.send(json.dumps({"alertForTurb": "⚠️ Turbidity value is out of range!"}))
+            send_fcm_notification("Turbidity Alert", f"Turbidity value {turb} is out of range!")
 
-# --- Thread to Start WebSocket Server ---
-def run_websocket():
-    loop = asyncio.new_event_loop()  # Create a new event loop
-    asyncio.set_event_loop(loop)  # Set it as the current event loop
-    port = int(os.environ.get("PORT", 10000)) + 1  # Offset to avoid conflict
-    loop.run_until_complete(websockets.serve(handle_websocket, "0.0.0.0", port))
-    print(f"🚀 WebSocket server running on port {port}...")
-    loop.run_forever()
+# Function to start WebSocket server
+async def start_websocket_server():
+    port = int(os.environ.get("PORT", 10000))  # Important for Render
+    server = await websockets.serve(handle_websocket, "0.0.0.0", port)
+    print(f"🚀 WebSocket server is running on port {port}...")
+    await server.wait_closed()
 
-# --- Main Entry ---
 if __name__ == "__main__":
-    # Start WebSocket server in a separate thread
-    websocket_thread = threading.Thread(target=run_websocket, daemon=True)
-    websocket_thread.start()
-
-    # Start Flask app for HTTP/Health Check
-    http_port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=http_port)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(start_websocket_server())
