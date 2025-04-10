@@ -98,7 +98,6 @@ def send_fcm_notification(title, body):
     except Exception as e:
         print(f"❌ FCM sending failed: {e}")
 
-# Function to check sensor thresholds and send FCM if out of range
 async def checkThreshold(data, websocket):
     ph_value = refPh.get()
     temp_value = refTemp.get()
@@ -123,16 +122,21 @@ async def checkThreshold(data, websocket):
             await websocket.send(json.dumps({"alertForTurb": "⚠️ Turbidity value is out of range!"}))
             send_fcm_notification("Turbidity Alert", f"Turbidity value {turb} is out of range!")
 
-# Function to start WebSocket server
-def start_websocket_server():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    ws_port = 8765  # separate port for WebSocket
-    start_server = websockets.serve(handle_websocket, "0.0.0.0", ws_port)
-    loop.run_until_complete(start_server)
-    print(f"🚀 WebSocket server is running on port {ws_port}...")
-    loop.run_forever()
+# Flask runner
+def run_flask():
+    app.run(host="0.0.0.0", port=5000)
 
+# WebSocket runner
+async def run_websocket():
+    port = int(os.environ.get("PORT", 10000))
+    server = await websockets.serve(handle_websocket, "0.0.0.0", port)
+    print(f"🚀 WebSocket server is running on port {port}...")
+    await server.wait_closed()
+
+# Entry point
 if __name__ == "__main__":
-    threading.Thread(target=start_websocket_server, daemon=True).start()
-    app.run(host="0.0.0.0", port=10000)
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.start()
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(run_websocket())
