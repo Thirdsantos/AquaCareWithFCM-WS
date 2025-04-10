@@ -6,6 +6,7 @@ from flask import Flask
 import firebase_admin
 from firebase_admin import credentials, db, messaging
 from dotenv import load_dotenv
+import threading
 
 load_dotenv()
 
@@ -32,8 +33,9 @@ refTurb = db.reference("Notification/Turbidity")
 ref = db.reference("Sensors")
 refNotif = db.reference("Notifications")
 
-@app.route("/")
-def index():
+# --- Flask App for HTTP/Health Check ---
+@app.route("/", methods=["GET", "HEAD"])
+def health_check():
     return "AQUACARE THE BRIDGE BETWEEN THE GAPS"
 
 async def handle_websocket(websocket, path):
@@ -114,12 +116,21 @@ async def checkThreshold(data, websocket):
             await websocket.send(json.dumps({"alertForTurb": "⚠️ Turbidity value is out of range!"}))
             # Optional: Add FCM for turbidity here
 
-async def start_websocket_server():
-    port = int(os.environ.get("PORT", 10000))  # Important for Render
-    server = await websockets.serve(handle_websocket, "0.0.0.0", port)
-    print(f"🚀 WebSocket server is running on port {port}...")
-    await server.wait_closed()
+# --- Thread to Start WebSocket Server ---
+def run_websocket():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    port = int(os.environ.get("PORT", 10000)) + 1  # Offset to avoid conflict
+    loop.run_until_complete(websockets.serve(handle_websocket, "0.0.0.0", port))
+    print(f"🚀 WebSocket server running on port {port}...")
+    loop.run_forever()
 
+# --- Main Entry ---
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_websocket_server())
+    # Start WebSocket server in a separate thread
+    websocket_thread = threading.Thread(target=run_websocket, daemon=True)
+    websocket_thread.start()
+
+    # Start Flask app for HTTP/Health Check
+    http_port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=http_port)
