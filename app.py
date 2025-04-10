@@ -118,8 +118,8 @@ async def checkThreshold(data, websocket):
 
 # --- Thread to Start WebSocket Server ---
 def run_websocket():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    loop = asyncio.new_event_loop()  # Create a new event loop
+    asyncio.set_event_loop(loop)  # Set it as the current event loop
     port = int(os.environ.get("PORT", 10000)) + 1  # Offset to avoid conflict
     loop.run_until_complete(websockets.serve(handle_websocket, "0.0.0.0", port))
     print(f"🚀 WebSocket server running on port {port}...")
